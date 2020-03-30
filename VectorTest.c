@@ -17,19 +17,25 @@
 // cd ".\Parallel"
 // g++ VectorTest.c -o VectorTest.exe -fopenmp
 
+
 struct timer_st {
-	double start_time, total_time;
+	// double start_time, total_time;
+	double *const start_time = (double *const) malloc(sizeof(double));
+	double *const total_time = (double *const) malloc(sizeof(double));
 	timer_st() {}
 	void start() const {
-		( const_cast <timer_st*> (this) ) -> start_time = clock();
+		// ( const_cast <timer_st*> (this) ) -> start_time = clock();
+		*start_time = clock();
 	}
 	void end() const {
-		( const_cast <timer_st*> (this) ) -> total_time = clock() - start_time;
+		// ( const_cast <timer_st*> (this) ) -> total_time = clock() - start_time;
+		*total_time = clock() - *start_time;
 	}
 	void print() const {
-		printf("Time = %f\n", total_time / CLOCKS_PER_SEC);
+		printf("Time = %f\n", (*total_time) / CLOCKS_PER_SEC);
 	}
 };
+
 
 // Test with sizes: 50 M, 80 M, 100 M;
 // [4 threads]
