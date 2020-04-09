@@ -35,18 +35,26 @@ struct timer_st {
 	timer_st() {}
 	void start() const {
 		// ( const_cast <timer_st*> (this) ) -> start_time = clock();
-		*start_time = clock();
+		*start_time = time();
 	}
 	void end() const {
 		// ( const_cast <timer_st*> (this) ) -> total_time = clock() - start_time;
-		*total_time = clock() - *start_time;
+		*total_time = time() - *start_time;
 	}
 	void print() const {
-		printf("Time = %f\n", (*total_time) / CLOCKS_PER_SEC);
+		printf("Time = %f\n", (*total_time) / div());
 	}
 	void destruct() const {
 		free(start_time);
 		free(total_time);
+	}
+	double time() const {
+		// return clock();
+		return omp_get_wtime();
+	}
+	double div() const {
+		// reutn CLOCKS_PER_SEC;
+		return 1;
 	}
 };
 
