@@ -53,7 +53,7 @@ struct timer_st {
 		return omp_get_wtime();
 	}
 	double div() const {
-		// reutn CLOCKS_PER_SEC;
+		// return CLOCKS_PER_SEC;
 		return 1;
 	}
 };

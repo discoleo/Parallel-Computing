@@ -18,6 +18,7 @@
 // g++ VectorTest.c -o VectorTest.exe -fopenmp
 
 
+// Timer
 struct timer_st {
 	// double start_time, total_time;
 	double *const start_time = (double *const) malloc(sizeof(double));
@@ -25,14 +26,26 @@ struct timer_st {
 	timer_st() {}
 	void start() const {
 		// ( const_cast <timer_st*> (this) ) -> start_time = clock();
-		*start_time = clock();
+		*start_time = time();
 	}
 	void end() const {
 		// ( const_cast <timer_st*> (this) ) -> total_time = clock() - start_time;
-		*total_time = clock() - *start_time;
+		*total_time = time() - *start_time;
 	}
 	void print() const {
-		printf("Time = %f\n", (*total_time) / CLOCKS_PER_SEC);
+		printf("Time = %f\n", (*total_time) / div());
+	}
+	void destruct() const {
+		free(start_time);
+		free(total_time);
+	}
+	double time() const {
+		// return clock();
+		return omp_get_wtime();
+	}
+	double div() const {
+		// return CLOCKS_PER_SEC;
+		return 1;
 	}
 };
 
@@ -138,6 +151,7 @@ int main(int argc, char *argv[])  {
 	// END
 	free(x);
 	free(y);
+	free(timer);
 } 
 
 
