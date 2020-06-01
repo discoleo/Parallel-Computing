@@ -44,8 +44,10 @@ struct timer_st {
 		// ( const_cast <timer_st*> (this) ) -> total_time = clock() - start_time;
 		*total_time = time() - *start_time;
 	}
-	void print() const {
-		printf("Time = %f\n", (*total_time) / div());
+	double print() const {
+		const double dTime = (*total_time) / div();
+		printf("Time = %f\n", dTime);
+		return dTime;
 	}
 	void destruct() const {
 		free(start_time);
@@ -56,17 +58,29 @@ struct timer_st {
 		return omp_get_wtime();
 	}
 	double div() const {
-		// reutn CLOCKS_PER_SEC;
+		// return CLOCKS_PER_SEC;
 		return 1;
 	}
 };
 
-// Test with sizes: 10 M, 40 M, 160 M;
+// ===================================
+
+// Test with sizes:
+// workaround for bugs with pow(x, 1/3):
+// 1000000, 1000002, 8000000, 8000002, 16000000, 16003008, 16003010
+// 27000000, 27000002, 125000002
+// Initial Tests: 10 M, 40 M, 160 M;
 // [4 threads]
 int main(int argc, char *argv[])  {
 	const double PI25DT = 3.141592653589793238462643;
 	
-	unsigned int npoints, i;
+	// Measurements
+	const unsigned int nTotal = 7;
+	double * const dTimes = (double * const) malloc(nTotal * sizeof(double));
+	double * const dPi    = (double * const) malloc(nTotal * sizeof(double));
+	unsigned int idTime = 0;
+	
+	unsigned int npoints;
 	unsigned int sum = 0;
 	double rand_x, rand_y, rand_z, rand_z4; // z: for 3D & 4D variants
 	// for RNG
@@ -74,6 +88,7 @@ int main(int argc, char *argv[])  {
 	
 	const timer_st timer = timer_st();
 	
+	// Threads
 	const unsigned int num_of_threads = omp_get_num_procs();
 	omp_set_num_threads(num_of_threads);
 	// num_of_threads = omp_get_num_threads();
@@ -85,11 +100,11 @@ int main(int argc, char *argv[])  {
 		return -1;
 	}
 	
-	// Parallel with Reduction
+	// ++++ Parallel with Reduction ++++
 	timer.start();
 	sum = 0;
 	#pragma omp parallel default(none) \
-					private(rand_x, rand_y, i) \
+					private(rand_x, rand_y) \
 					shared(npoints) reduction(+: sum)
 	{
 		const unsigned int sample_points_per_thread = npoints / num_of_threads;
@@ -102,7 +117,7 @@ int main(int argc, char *argv[])  {
 		// const double MIN = uint_dist.min();
 		// printf("MAX = %f\n", MAX);
 		
-		for (i = 0; i < sample_points_per_thread; i++) {
+		for (int i = 0; i < sample_points_per_thread; i++) {
 			rand_x = ((double) uint_dist(rnd)) / MAX;
 			rand_y = ((double) uint_dist(rnd)) / MAX;
 			if (((rand_x - 0.5) * (rand_x - 0.5) +
@@ -112,15 +127,16 @@ int main(int argc, char *argv[])  {
 		}
 		printf("Sum = %u\n", sum);
 	}
-	const double dPI = ((double) sum) * 4 / npoints;
+	dPi[idTime] = ((double) sum) * 4 / npoints;
 	timer.end();
-	timer.print();
-	printf("Pi = %f\n", dPI);
-	
-	// Parallel with Reduction; Real RNG;
+	dTimes[idTime] = timer.print();
+	printf("Pi = %f\n\n", dPi[idTime]);
+
+
+	// ++++ Parallel with Reduction: Real RNG ++++
 	timer.start();
 	sum = 0;
-	#pragma omp parallel default(none) private(rand_x, rand_y, i) shared(npoints) reduction(+: sum)
+	#pragma omp parallel default(none) private(rand_x, rand_y) shared(npoints) reduction(+: sum)
 	{
 		const unsigned int sample_points_per_thread = npoints / num_of_threads;
 		// RNG
@@ -129,7 +145,7 @@ int main(int argc, char *argv[])  {
 		rnd.seed(seed * idThread * idThread);
 		std::uniform_real_distribution<double> uint_dist(0, 1);
 		
-		for (i = 0; i < sample_points_per_thread; i++) {
+		for (int i = 0; i < sample_points_per_thread; i++) {
 			rand_x = ((double) uint_dist(rnd));
 			rand_y = ((double) uint_dist(rnd));
 			if (((rand_x - 0.5) * (rand_x - 0.5) +
@@ -139,17 +155,17 @@ int main(int argc, char *argv[])  {
 		}
 		printf("Sum = %u\n", sum);
 	}
-	const double dPI2 = ((double) sum) * 4 / npoints;
+	dPi[++idTime] = ((double) sum) * 4 / npoints;
 	timer.end();
-	timer.print();
-	printf("Pi [Real RND] = %f\n\n", dPI2);
+	dTimes[idTime] = timer.print();
+	printf("Pi [Real RND] = %f\n\n", dPi[idTime]);
 	
 	
 	// ++++ Parallel 3D ++++
 	timer.start();
 	sum = 0;
 	#pragma omp parallel default(none) \
-					private(rand_x, rand_y, rand_z, i) \
+					private(rand_x, rand_y, rand_z) \
 					shared(npoints) reduction(+: sum)
 	{
 		const unsigned int sample_points_per_thread = npoints / num_of_threads;
@@ -162,7 +178,7 @@ int main(int argc, char *argv[])  {
 		// const double MIN = uint_dist.min();
 		// printf("MAX = %f\n", MAX);
 		
-		for (i = 0; i < sample_points_per_thread; i++) {
+		for (int i = 0; i < sample_points_per_thread; i++) {
 			rand_x = ((double) uint_dist(rnd)) / MAX;
 			rand_y = ((double) uint_dist(rnd)) / MAX;
 			rand_z = ((double) uint_dist(rnd)) / MAX;
@@ -174,17 +190,17 @@ int main(int argc, char *argv[])  {
 		}
 		printf("Sum = %u\n", sum);
 	}
-	const double dPI3D = ((double) sum) * 3 * 2 / npoints;
+	dPi[++idTime] = ((double) sum) * 3 * 2 / npoints;
 	timer.end();
-	timer.print();
-	printf("Pi 3D = %f\n\n", dPI3D);
+	dTimes[idTime] = timer.print();
+	printf("Pi 3D = %f\n\n", dPi[idTime]);
 	
 	
 	// ++++ Parallel 4D ++++
 	timer.start();
 	sum = 0;
 	#pragma omp parallel default(none) \
-					private(rand_x, rand_y, rand_z, rand_z4, i) \
+					private(rand_x, rand_y, rand_z, rand_z4) \
 					shared(npoints) reduction(+: sum)
 	{
 		const unsigned int sample_points_per_thread = npoints / num_of_threads;
@@ -197,7 +213,7 @@ int main(int argc, char *argv[])  {
 		// const double MIN = uint_dist.min();
 		// printf("MAX = %f\n", MAX);
 		
-		for (i = 0; i < sample_points_per_thread; i++) {
+		for (int i = 0; i < sample_points_per_thread; i++) {
 			rand_x = ((double) uint_dist(rnd)) / MAX;
 			rand_y = ((double) uint_dist(rnd)) / MAX;
 			rand_z = ((double) uint_dist(rnd)) / MAX;
@@ -211,10 +227,10 @@ int main(int argc, char *argv[])  {
 		}
 		printf("Sum = %u\n", sum);
 	}
-	const double dPI4D = sqrt(((double) sum) * 2 * 16 / npoints);
+	dPi[++idTime] = sqrt(((double) sum) * 2 * 16 / npoints);
 	timer.end();
-	timer.print();
-	printf("Pi 4D = %f\n\n", dPI4D);
+	dTimes[idTime] = timer.print();
+	printf("Pi 4D = %f\n\n", dPi[idTime]);
 	
 	// =====================
 	// ++++ Without RNG ++++
@@ -227,12 +243,12 @@ int main(int argc, char *argv[])  {
 	// TODO: can loose a few pixels
 	const unsigned int sample_points_per_thread = sample_points / num_of_threads;
 	sum = 0;
-	#pragma omp parallel default(none) private(rand_x, rand_y, i) reduction(+: sum)
+	#pragma omp parallel default(none) private(rand_x, rand_y) reduction(+: sum)
 	{
 		const unsigned int idThread = omp_get_thread_num();
 		const unsigned int lenMax = (idThread + 1) * sample_points_per_thread;
 		
-		for (i = idThread * sample_points_per_thread; i < lenMax; i++) {
+		for (int i = idThread * sample_points_per_thread; i < lenMax; i++) {
 			rand_x = ((double) ((int)(i / sqLen)) ) / sqLen;
 			rand_y = ((double) (i % sqLen)) / sqLen;
 			if (((rand_x - 0.5) * (rand_x - 0.5) +
@@ -242,10 +258,10 @@ int main(int argc, char *argv[])  {
 		}
 		printf("Thread = %u, Sum = %u\n", idThread, sum);
 	}
-	const double dPI3 = ((double) sum) * 4 / sample_points;
+	dPi[++idTime] = ((double) sum) * 4 / sample_points;
 	timer.end();
-	timer.print();
-	printf("Non-Random Pi = %f\n\n", dPI3);
+	dTimes[idTime] = timer.print();
+	printf("Non-Random Pi = %f\n\n", dPi[idTime]);
 	}
 	
 	// ++++ 3D without RNG ++++
@@ -257,13 +273,13 @@ int main(int argc, char *argv[])  {
 	// TODO: can loose a few pixels
 	const unsigned int sample_points_per_thread = sample_points / num_of_threads;
 	sum = 0;
-	#pragma omp parallel default(none) private(rand_x, rand_y, rand_z, i) reduction(+: sum)
+	#pragma omp parallel default(none) private(rand_x, rand_y, rand_z) reduction(+: sum)
 	{
 		const unsigned int idThread = omp_get_thread_num();
 		const unsigned int lenMax = (idThread + 1) * sample_points_per_thread;
 		const int sqLen = p3Len * p3Len;
 		
-		for (i = idThread * sample_points_per_thread; i < lenMax; i++) {
+		for (int i = idThread * sample_points_per_thread; i < lenMax; i++) {
 			int x = (int)(i / sqLen);
 			rand_x = ((double) x) / p3Len;
 			int yz = i - x * sqLen; // %
@@ -277,15 +293,55 @@ int main(int argc, char *argv[])  {
 		}
 		printf("Thread = %u, Sum = %u\n", idThread, sum);
 	}
-	const double dPI3 = ((double) sum) * 6 / sample_points;
+	dPi[++idTime] = ((double) sum) * 6 / sample_points;
 	timer.end();
-	timer.print();
+	dTimes[idTime] = timer.print();
 	// ~1/3 slower, BUT 4th digit accuracy does NOT converge!
-	printf("Non-Random Pi 3D = %f\n", dPI3);
+	printf("Non-Random Pi 3D = %f\n\n", dPi[idTime]);
+	}
+	
+	// ++++ 3D: Version 2 ++++
+	{
+	timer.start();
+	const int p3Len = (int) pow(npoints, 1.0d / 3);
+	printf("R = %d\n", p3Len);
+	const unsigned int sample_points = p3Len * p3Len * p3Len;
+	sum = 0;
+	#pragma omp parallel for default(none) private(rand_x, rand_y, rand_z) \
+			reduction(+: sum) collapse(3)
+	for (int i1=0; i1 < p3Len; i1++) {
+		for (int i2=0; i2 < p3Len; i2++) {
+			for (int i3=0; i3 < p3Len; i3++) {
+				rand_x = ((double) i1) / p3Len;
+				rand_y = ((double) i2) / p3Len;
+				rand_z = ((double) i3) / p3Len;
+				if (((rand_x - 0.5) * (rand_x - 0.5) +
+					(rand_y - 0.5) * (rand_y - 0.5) +
+					(rand_z - 0.5) * (rand_z - 0.5)) <= 0.25) {
+					sum ++;
+				}
+			}
+		}
+	}
+	// printf("Thread = %u, Sum = %u\n", idThread, sum);
+	dPi[++idTime] = ((double) sum) * 6 / sample_points;
+	timer.end();
+	dTimes[idTime] = timer.print();
+	// ~1/3 slower, BUT 4th digit accuracy does NOT converge!
+	printf("Pi 3D [v2] = %f\n\n", dPi[idTime]);
+	}
+	
+	// ===============
+	// ===============
+	
+	for(int i=0; i < nTotal; i++) {
+		printf("Pi %f Time %f\n", dPi[i], dTimes[i]);
 	}
 	
 	// ===============
 	
 	// END
 	timer.destruct();
+	free(dTimes);
+	free(dPi);
 }
